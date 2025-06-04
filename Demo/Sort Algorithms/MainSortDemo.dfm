@@ -29,6 +29,8 @@ object frmSortDemo: TfrmSortDemo
     Margins.Bottom = 5
     Align = alLeft
     Caption = 'gbSelectSort'
+    DoubleBuffered = True
+    ParentDoubleBuffered = False
     TabOrder = 0
     object pbSelectSort: TPaintBox
       Left = 2
@@ -58,6 +60,8 @@ object frmSortDemo: TfrmSortDemo
     Margins.Bottom = 5
     Align = alLeft
     Caption = 'gbMergeSort'
+    DoubleBuffered = True
+    ParentDoubleBuffered = False
     TabOrder = 1
     object pbMergeSort: TPaintBox
       Left = 2
@@ -85,6 +89,8 @@ object frmSortDemo: TfrmSortDemo
     Margins.Bottom = 5
     Align = alClient
     Caption = 'gbQuickSort'
+    DoubleBuffered = True
+    ParentDoubleBuffered = False
     TabOrder = 2
     object pbQuickSort: TPaintBox
       Left = 2
@@ -861,5 +867,10 @@ object frmSortDemo: TfrmSortDemo
       FFFFFFFF000000000000000000000000FFFFFFFF000000000000000000000000
       FFFFFFFF00000000000000000000000000000000000000000000000000000000
       000000000000}
+  end
+  object tmrDelayedUpdates: TTimer
+    OnTimer = tmrDelayedUpdatesTimer
+    Left = 192
+    Top = 459
   end
 end

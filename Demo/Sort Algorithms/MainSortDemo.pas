@@ -44,6 +44,7 @@ type
     edMaxValue: TSpinEdit;
     Label1: TLabel;
     cbDelayGUI: TCheckBox;
+    tmrDelayedUpdates: TTimer;
     procedure FormCreate(Sender: TObject);
     procedure sbRefreshArrayClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
@@ -51,6 +52,7 @@ type
     procedure FormResize(Sender: TObject);
     procedure cbLogKindChange(Sender: TObject);
     procedure cbLogLevelChange(Sender: TObject);
+    procedure tmrDelayedUpdatesTimer(Sender: TObject);
   private
     ThreadsRunning : Integer;
     fSelectThread  : TSelectionSort;
@@ -161,6 +163,7 @@ begin
     btnClose.Caption := 'Pause'
   else
     btnClose.Caption := 'Close';
+  tmrDelayedUpdates.Enabled := cbDelayGUI.Checked and (ThreadsRunning > 0);
   Repaint;
 end;
 
@@ -180,6 +183,18 @@ begin
     fMergeThread  := nil;
   if Sender is TQuickSort then
     fQuickThread  := nil;
+end;
+
+procedure TfrmSortDemo.tmrDelayedUpdatesTimer(Sender: TObject);
+begin
+  if ThreadsRunning > 0 then begin
+    if Assigned(fSelectThread) then
+      gbSelectSort.Invalidate;
+    if Assigned(fMergeThread) then
+      gbMergeSort.Invalidate;
+    if Assigned(fQuickThread) then
+      gbQuickSort.Invalidate;
+  end;
 end;
 
 procedure TfrmSortDemo.btnCloseClick(Sender: TObject);

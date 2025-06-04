@@ -205,7 +205,7 @@ end;
 
 procedure TBubbleSort.Sort(var aArray: TIntegerDynArray);
 var
-  I, J, K: Integer;
+  I, J: Integer;
 begin
   for I := Low(aArray) to High(aArray) - 1 do
     for J := High(aArray) downto I + 1 do

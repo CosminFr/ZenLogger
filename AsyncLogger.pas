@@ -28,7 +28,6 @@ type
   protected
     fQueue     : TThreadedQueue<String>;
     fTask      : ITask;
-    fIsRunning : Boolean;
     fQueueLen  : Integer;
     procedure WriteLog(const Line:string); override;
   public
@@ -96,7 +95,6 @@ begin
   fQueue     := TThreadedQueue<String>.Create(100);
   fQueueLen  := 100;   //Default "QueueDepth"
   fTask      := nil;
-  fIsRunning := False;
 end;
 
 destructor TAsyncLogger.Destroy;
@@ -124,13 +122,8 @@ end;
 
 procedure TAsyncLogger.Flush;
 begin
-  while fIsRunning do begin
-    //Wait for task to complete (aka finish writting to the log)
-    if Assigned(fTask) and (fTask.Status < TTaskStatus.Completed) then
-      fTask.Wait(10000)
-    else
-      Break;
-  end;
+  if Assigned(fTask) and (fTask.Status < TTaskStatus.Completed) then
+    fTask.Wait;
 end;
 
 procedure TAsyncLogger.WriteLog(const Line: string);
@@ -142,22 +135,31 @@ begin
   end;
   fQueue.PushItem(Line);
 
-//  if not Assigned(fTask) or (fTask.Status > TTaskStatus.Running) then begin
-  if not fIsRunning then begin
+  if not Assigned(fTask) or (fTask.Status > TTaskStatus.Running) then begin
     //Start task to write Line to the log
-    fIsRunning := True;
     fTask := TTask.Run(
       procedure
+      var
+        ioRes : Integer;   //copy of IOResult so it can be logged.
+        lFile : TextFile;
+        lLine : String;
       begin
-        var cnt := 0;
-        while fQueue.TotalItemsPushed > fQueue.TotalItemsPopped do begin
-          inherited WriteLog(fQueue.PopItem);
-          Inc(cnt);
+        OpenFile(lFile);
+        try
+          {$I-}
+          while fQueue.TotalItemsPushed > fQueue.TotalItemsPopped do begin
+            //Write line
+            lLine := fQueue.PopItem;
+            Writeln(lFile, lLine);
+            ioRes := IOResult;
+            if ioRes <> 0 then
+              InternalDebugLog.Debug('Trying to Write... IOResult=%d; Line=%s', [ioRes, lLine]);
+          end;
+          {$I+}
+        finally
+          CloseFile(lFile);
         end;
-        fIsRunning := False;
-//        InternalDebugLog.Debug('Task Completed: Queue Size=%d (LineCount=%d); TotalItemsPushed=%d; TotalItemsPopped=%d .', [fQueue.QueueSize, cnt, fQueue.TotalItemsPushed, fQueue.TotalItemsPopped]);
       end);
-//    InternalDebugLog.Debug('Task Started: Queue Size=%d (Capacity=%d); TotalItemsPushed=%d; TotalItemsPopped=%d .', [fQueue.QueueSize, fQueueLen, fQueue.TotalItemsPushed, fQueue.TotalItemsPopped]);
   end;
 end;
 

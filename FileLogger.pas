@@ -42,6 +42,9 @@ type
     procedure WriteLog(const Line:string); override;
     function  GetLogFileName: string; virtual;
 
+    procedure OpenFile(var aLogFile : TextFile);
+    procedure CloseFile(var aLogFile : TextFile);
+
     function  InternalDebugLog: ILogger; override;
     procedure DeleteOldFiles;
   public
@@ -54,7 +57,6 @@ type
     property  LogPath     : String  read GetLogPath     write SetLogPath;
     property  LogName     : String  read GetLogName     write SetLogName;
     property  LogFileName : String  read GetLogFileName;
-    property  LogLevel    : Integer read GetLogLevel    write SetLogLevel;
     property  DaysKeep    : Integer read GetDaysKeep    write SetDaysKeep;
   end;
   TFileLoggerClass = class of TFileLogger;
@@ -152,23 +154,22 @@ begin
 end;
 {$ENDREGION}
 
-procedure TFileLogger.WriteLog(const Line: string);
+procedure TFileLogger.OpenFile(var aLogFile : TextFile);
 var
-  LogFile : Text;
   Count   : Integer;
   ioRes   : Integer;   //copy of IOResult so it can be logged.
 begin
-  System.AssignFile(LogFile, LogFileName);
+  System.AssignFile(aLogFile, LogFileName);
   {$I-}
   //Keep trying to open for writing
   Count := 0;
   while Count < 1000 do begin
-    System.Append(LogFile);
+    System.Append(aLogFile);
     ioRes := IOResult;
     case ioRes of
       0   : Break;
       2   : begin                                //2   = File not found
-              System.Rewrite(LogFile);
+              System.Rewrite(aLogFile);
               {$I+}
               try
                 DeleteOldFiles;            //"new day" -> time for cleanup...
@@ -179,34 +180,52 @@ begin
               {$I-}
               Continue;
             end;
-      3   : ForceDirectories(LogPath);         //3   = Path not found
-      32  : Sleep(Count *10);                    //32  = Sharing violation
-      102 : AssignFile(LogFile, LogFileName);    //102 = File not assigned.
+      3   : ForceDirectories(LogPath);            //3   = Path not found
+      32  : Sleep(Count *10);                     //32  = Sharing violation
+      102 : AssignFile(aLogFile, LogFileName);    //102 = File not assigned.
       else  Sleep(1);
     end;
     Inc(Count);
     if ioRes <> 32 then  //skip debug logging an expected condition.
       InternalDebugLog.Debug('Trying to Append... IOResult=%d; Attempt=%d; Class=%s; Obj=%d', [ioRes, Count, ClassName, Integer(Self)]);
   end;
+  {$I+}
+end;
+
+procedure TFileLogger.WriteLog(const Line: string);
+var
+  LogFile : Text;
+  ioRes   : Integer;
+begin
+  OpenFile(LogFile);
+  {$I-}
   //Write line
   Writeln(LogFile, Line);
   ioRes := IOResult;
   if ioRes <> 0 then
     InternalDebugLog.Debug('Trying to Write... IOResult=%d; Obj=%d; Line=%s', [ioRes, Integer(Self), Line]);
+  {$I+}
+  CloseFile(LogFile);
+end;
 
-  System.CloseFile(LogFile);
+procedure TFileLogger.CloseFile(var aLogFile : TextFile);
+var
+  ioRes : Integer;
+begin
+  {$I-}
+  System.CloseFile(aLogFile);
   ioRes := IOResult;
   if ioRes <> 0 then
-    InternalDebugLog.Debug('Trying to CloseFile... IOResult=%d; Obj=%d; Line=%s', [ioRes, Integer(Self), Line]);
+    InternalDebugLog.Debug('Trying to CloseFile... IOResult=%d', [ioRes]);
   {$I+}
 end;
 
 procedure TFileLogger.DeleteOldFiles;
 var
-  FileName: string;
-  OlderThan: TDateTime;
+  FileName  : string;
+  OlderThan : TDateTime;
 begin
-  OlderThan := Trunc(Date() - DaysKeep);
+  OlderThan := Date() - DaysKeep;
   for FileName in TDirectory.GetFiles(fLogPath, '*.log') do
     if TFile.GetCreationTime(FileName) < OlderThan then
     try

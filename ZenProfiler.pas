@@ -112,12 +112,10 @@ type
   private
     type
       TStatsData = class
-        Key        : String;
         Count      : Integer;
         MaxTime    : Int64;
         MinTime    : Int64;
         TotalTime  : Int64;
-        constructor Create(const aKey: String);
       end;
       TTotalTimeComparer = class(TInterfacedObject, IComparer<TStatsData>)
         function Compare(const Left, Right: TStatsData): Integer;
@@ -125,6 +123,7 @@ type
     class var _clsDict : TOrderedDictionary<String, TStatsData>;
     class constructor ClassCreate;
     class destructor  ClassDestroy;
+    class procedure DoValueNotify(Sender: TObject; const Value: TStatsData; Action: TCollectionNotification);
 
   protected
     class function  GetDefaultFileName: String;
@@ -222,6 +221,7 @@ class constructor TZenProfiler.ClassCreate;
 begin
   inherited;
   _clsDict := TOrderedDictionary<String, TStatsData>.Create;
+  _clsDict.OnValueNotify := DoValueNotify;
 end;
 
 class destructor TZenProfiler.ClassDestroy;
@@ -230,18 +230,21 @@ begin
   inherited;
 end;
 
+class procedure TZenProfiler.DoValueNotify(Sender: TObject; const Value: TStatsData; Action: TCollectionNotification);
+begin
+  if Assigned(Value) and (Action = cnRemoved) then
+    Value.Free;
+end;
+
 class function TZenProfiler.GetDefaultFileName: String;
 var
   AppName : String;
+  AppPath : String;
 begin
-  if (Default_LogName = '') or (Default_LogPath = '') then begin
-    AppName := GetModuleName(HInstance);
-    if Default_LogName = '' then
-      Default_LogName := TPath.GetFileNameWithoutExtension(AppName);
-    if Default_LogPath = '' then
-      Default_LogPath := TPath.GetDirectoryName(AppName);
-  end;
-  Result := IncludeTrailingPathDelimiter(Default_LogPath) + Default_LogName + '_Profiler.txt';
+  AppName := GetModuleName(HInstance);
+  AppPath := TPath.GetDirectoryName(AppName);
+  AppName := TPath.GetFileNameWithoutExtension(AppName);
+  Result  := IncludeTrailingPathDelimiter(AppPath) + AppName + '_Profiler.txt';
 end;
 
 class procedure TZenProfiler.Add(const aKey: String; const aTime: Int64);
@@ -249,7 +252,7 @@ var
   Data : TStatsData;
 begin
   if not _clsDict.TryGetValue(aKey, Data) then begin
-    Data := TStatsData.Create(aKey);
+    Data := TStatsData.Create;
     _clsDict.AddOrSetValue(aKey, Data);
   end;
   Inc(Data.Count);
@@ -312,18 +315,6 @@ end;
 class procedure TZenProfiler.Reset;
 begin
   _clsDict.Clear;
-end;
-
-{ TZenProfiler.TStatsData }
-
-constructor TZenProfiler.TStatsData.Create(const aKey: String);
-begin
-  inherited Create;
-  Key        := aKey;
-  Count      := 0;
-  MaxTime    := 0;
-  MinTime    := 0;
-  TotalTime  := 0;
 end;
 
 { TZenProfiler.TTotalTimeComparer }
