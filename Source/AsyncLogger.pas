@@ -1,5 +1,33 @@
 unit AsyncLogger;
+(***********************************************************************************************************************
 
+  Extending the Standard File Logger with two more loggers:
+
+  TThreadSafeLogger
+  =================
+  Name may be a bit misleading as the Standard logger is Thread Safe too. However, this goes a bit more paranoid with
+  a Mutex to ensure no other process is even attempting to write in the same time.
+  It also changes the "line context" by adding "TH-<CurrentThreadId>" before the message. Thus, making it more clear
+  which thread sent that message to the log. Could be quite usefull during investigations and the main reason it's
+  still provided.
+
+  TAsyncLogger
+  ================
+  Changes the default WriteLog behavior by adding the line to a thread safe Queue and launching a backgroud task to
+  update the log file.
+
+  Notes:
+    * There is no permanent thread running to monitor the queue and do the updates. The background tasks are created
+      as needed from default pool. Very fast and not much overhead.
+    * As the process can continue as soon as the Line is added to the threaded queue, the impact to app flow is low.
+    * Even better, as the Queue might hold more than one line, the file processing times is much improved over the
+      "Line by Line" behavior of the Standard logger.
+
+************************************************************************************************************************
+Developer: Cosmin Frentiu
+Licence:   GPL v3
+Homepage:  https://github.com/CosminFr/ZenLogger
+***********************************************************************************************************************)
 interface
 
 uses
@@ -9,7 +37,7 @@ uses
   System.SyncObjs,
   System.Generics.Collections,
   System.Threading,
-  ZenLogger, FileLogger, LogManager;
+  ZenLogger, FileLogger, LogManager, LogFileStream;
 
 type
   TThreadSafeLogger = class(TFileLogger)
@@ -136,28 +164,17 @@ begin
   fQueue.PushItem(Line);
 
   if not Assigned(fTask) or (fTask.Status > TTaskStatus.Running) then begin
-    //Start task to write Line to the log
+    //Start new task to write Line to the log
     fTask := TTask.Run(
       procedure
-      var
-        ioRes : Integer;   //copy of IOResult so it can be logged.
-        lFile : TextFile;
-        lLine : String;
       begin
-        OpenFile(lFile);
+        CheckLogName;
+        Stream.BeginAccess;
         try
-          {$I-}
-          while fQueue.TotalItemsPushed > fQueue.TotalItemsPopped do begin
-            //Write line
-            lLine := fQueue.PopItem;
-            Writeln(lFile, lLine);
-            ioRes := IOResult;
-            if ioRes <> 0 then
-              InternalDebugLog.Debug('Trying to Write... IOResult=%d; Line=%s', [ioRes, lLine]);
-          end;
-          {$I+}
+          while fQueue.TotalItemsPushed > fQueue.TotalItemsPopped do
+            Stream.WriteLine(fQueue.PopItem);
         finally
-          CloseFile(lFile);
+          Stream.EndAccess;
         end;
       end);
   end;

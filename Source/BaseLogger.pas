@@ -1,5 +1,38 @@
 unit BaseLogger;
+(***********************************************************************************************************************
 
+  Basic implementation for ILogger interface.
+
+  TAbstractLogger
+  ================
+  As the name suggests, this is an ABSTRACT class without an implementation for the main method:
+    * WriteLog(const Line:string); virtual; abstract;
+  However, it handles the various overloads and boring level functions.
+    * WriteLogLine(LineType, MsgText) - checks log level for that LineType & formats log line to be sent to the log
+       > WriteLog( FormatDateTime('hh:mm:ss.zzz', Now()) + LOG_TYPE_NAME[LineType] + MsgText );
+       The date part is missing intentionally as it's part of the file name!
+       See TThreadSafeLogger or TTraceLogger for other samples of log line templates
+    * WriteLogLineFmt(LineType, MsgText, Args) - minor variation of the above
+    * LogKindName - class function - please override if making other loggers to give a unique name for that kind/class
+    * InternalDebugLog - use it for debugging as needed.
+        -> Console logger if in DEBUG mode
+        -> NUll logger otherwise
+
+  TNullLogger
+  ================
+  Overrides some the methods just to ensure it does nothing!
+  Maybe a bit over the top. Any log with LogLevel=0 would behave the same.
+
+  TConsoleLogger
+  ================
+  Uses IsConsoleApp function to detect if the Std_Output_Handle is valid (once on create).
+    # if available sends the log message to the console with "WriteLn(Line)"
+
+************************************************************************************************************************
+Developer: Cosmin Frentiu
+Licence:   GPL v3
+Homepage:  https://github.com/CosminFr/ZenLogger
+***********************************************************************************************************************)
 interface
 
 uses
@@ -57,6 +90,7 @@ type
     procedure LoadConfig(const LogOptions: TLogConfig = nil); override;
     procedure WriteLog(const Line:string); override;
     procedure WriteLogLine(const LineType:TLogLineType; const MsgText :string); override;
+    procedure WriteLogLineFmt(const LineType:TLogLineType; const MsgText :string; const Args: array of const); override;
   public
     class function LogKindName: String; override;
   end;
@@ -125,8 +159,7 @@ procedure TAbstractLogger.WriteLogLine(const LineType: TLogLineType; const MsgTe
 begin
   if fLogLevel >= Ord(LineType) then
     try
-      WriteLog( FormatDateTime('hh:mm:ss.zzz', Now())
-                 + LOG_TYPE_NAME[LineType] + MsgText );
+      WriteLog( FormatDateTime('hh:mm:ss.zzz', Now()) + LOG_TYPE_NAME[LineType] + MsgText );
     except
       on E:Exception do begin
         OutputDebugString(PChar(Format('Error writing to log "%s %s": %s', [LOG_TYPE_NAME[LineType], MsgText, E.Message])));
@@ -247,6 +280,11 @@ begin
 end;
 
 procedure TNullLogger.WriteLogLine(const LineType: TLogLineType; const MsgText: string);
+begin
+  //Do Nothing
+end;
+
+procedure TNullLogger.WriteLogLineFmt(const LineType: TLogLineType; const MsgText: string; const Args: array of const);
 begin
   //Do Nothing
 end;

@@ -1,5 +1,41 @@
 unit LogManager;
+(***********************************************************************************************************************
 
+  TLogKindRegistry
+  ================
+  A simple Dictionary with an Integer Key (LogKind) and the registred class TLoggerClass
+    > TLogKindRegistry = TDictionary<Integer, TLoggerClass>;
+  See main form in "Demo/Multi Thread" how a combo box is initialized with the registered classes.
+  Tip: uses TLoggerClass.LogKindName to display a friendlier name (otherwise TLoggerClass.ClassName)
+
+
+  TLogManager
+  ================
+  Don't instantiete! Always use as class.
+  It has three methods for <Log Kind> registration:
+    * RegisterLogKind   - registers <aKind> implementation so it can be instantiated later.
+    * UnRegisterLogKind - un-register the class;
+    * LogKindRegistry   - Allows access to the TLogKindRegistry dictionary.
+
+  It has (currently) two functions to create loggers:
+    * GetLogger(aKind, aConfig = nil)
+           - the generic use - aKind should be previously registered!
+           - see the initialization section where some pre-defined classes are registered, forcing specific logger kinds
+           - Other loggers (ex AsyncLogger.pas) have to be included in the project to register themselves
+    * GetTraceLogger(aContext, aLogger = nil): ITraceLogger;
+           - Specific call for the Trace Logger as it returns a ITraceLogger
+           - TraceLogger has usually a very limited scope!
+           - see ZenProfiler.pas for details
+
+    TBC - if a GetFileLogger should be added to return IFileLogger (has few additional properties)
+        - (for now) they should be used as all other loggers just through ILogger interface.
+
+
+************************************************************************************************************************
+Developer: Cosmin Frentiu
+Licence:   GPL v3
+Homepage:  https://github.com/CosminFr/ZenLogger
+***********************************************************************************************************************)
 interface
 
 uses

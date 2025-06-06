@@ -81,7 +81,7 @@ var
 implementation
 
 uses
-  SysUtils, Threading, ZenAsync;
+  SysUtils, Threading;
 
 const
   MERGE_SWAP_THRESHOLD = 5;

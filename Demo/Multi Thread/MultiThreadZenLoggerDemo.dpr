@@ -7,12 +7,14 @@ uses
   Vcl.Forms,
   MainDemoMultiThread in 'MainDemoMultiThread.pas' {frmMain},
   uLoggerTestThread in 'uLoggerTestThread.pas',
-  ZenLogger in '..\..\ZenLogger.pas',
-  LogManager in '..\..\LogManager.pas',
-  BaseLogger in '..\..\BaseLogger.pas',
-  FileLogger in '..\..\FileLogger.pas',
-  AsyncLogger in '..\..\AsyncLogger.pas',
-  MockLogger in '..\..\MockLogger.pas',
+  ZenLogger in '..\..\Source\ZenLogger.pas',
+  ZenProfiler in '..\..\Source\ZenProfiler.pas',
+  LogManager in '..\..\Source\LogManager.pas',
+  LogFileStream in '..\..\Source\LogFileStream.pas',
+  BaseLogger in '..\..\Source\BaseLogger.pas',
+  FileLogger in '..\..\Source\FileLogger.pas',
+  AsyncLogger in '..\..\Source\AsyncLogger.pas',
+  MockLogger in '..\..\Source\MockLogger.pas',
   Faker in 'Faker.pas';
 
 {$R *.res}

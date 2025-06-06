@@ -67,7 +67,7 @@ unit ZenLogger;
 ************************************************************************************************************************
 Developer: Cosmin Frentiu
 Licence:   GPL v3
-Homepage:  https://github.com/CosminFr
+Homepage:  https://github.com/CosminFr/ZenLogger
 ***********************************************************************************************************************)
 interface
 
@@ -121,13 +121,11 @@ type
     procedure Trace  (const MsgText: String; const Args: array of const); overload;
 
     procedure Flush;
-    procedure LoadConfig(const aConfig: TLogConfig);
 
     {$REGION '// Setters & Getters'}
     function  GetLogLevel: Integer;
     procedure SetLogLevel(const Value: Integer);
     {$ENDREGION}
-
     property  LogLevel : Integer read GetLogLevel write SetLogLevel;
   end;
 
@@ -143,15 +141,12 @@ type
     function  GetDaysKeep: Integer;
     procedure SetDaysKeep(const Value: Integer);
     {$ENDREGION}
-
     property  LogPath     : String  read GetLogPath     write SetLogPath;
     property  LogName     : String  read GetLogName     write SetLogName;
     property  LogFileName : String  read GetLogFileName;
     property  LogLevel    : Integer read GetLogLevel    write SetLogLevel;
     property  DaysKeep    : Integer read GetDaysKeep    write SetDaysKeep;
-
   end;
-
 
   ITraceLogger = interface(ILogger)
     function Trace: ILogger;

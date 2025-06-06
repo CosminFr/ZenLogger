@@ -109,12 +109,14 @@
             <Form>frmMain</Form>
         </DCCReference>
         <DCCReference Include="uLoggerTestThread.pas"/>
-        <DCCReference Include="..\..\ZenLogger.pas"/>
-        <DCCReference Include="..\..\LogManager.pas"/>
-        <DCCReference Include="..\..\BaseLogger.pas"/>
-        <DCCReference Include="..\..\FileLogger.pas"/>
-        <DCCReference Include="..\..\AsyncLogger.pas"/>
-        <DCCReference Include="..\..\MockLogger.pas"/>
+        <DCCReference Include="..\..\Source\ZenLogger.pas"/>
+        <DCCReference Include="..\..\Source\ZenProfiler.pas"/>
+        <DCCReference Include="..\..\Source\LogManager.pas"/>
+        <DCCReference Include="..\..\Source\LogFileStream.pas"/>
+        <DCCReference Include="..\..\Source\BaseLogger.pas"/>
+        <DCCReference Include="..\..\Source\FileLogger.pas"/>
+        <DCCReference Include="..\..\Source\AsyncLogger.pas"/>
+        <DCCReference Include="..\..\Source\MockLogger.pas"/>
         <DCCReference Include="Faker.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

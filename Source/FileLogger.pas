@@ -1,25 +1,64 @@
 unit FileLogger;
+(***********************************************************************************************************************
 
+  Basic implementation for ILogger interface.
+
+  TFileLogConfig
+  ================
+  Extends TLogConfig from ZenLogger (which had the LogLevel) with the file specific options:
+    * LogName
+    * LogPath
+    * DaysKeep
+
+  TFileLogger
+  ================
+  Implements the STANDARD logger and IFileLogger interface.
+  See some sample extensions in AsyncLogger.pas
+  If running the Demo apps the Async logger is WAY FASTER. However, in case of issues there is a potential risk that the
+  application crashed in a completely different point than what the logger shows.
+  With the Standard logger there is a safety in knowing that the application processes are "synchronized" with the log.
+  If/when something happens, an up-to-date log file is available. Although, it wont say much if the log level was too low.
+
+  Tip: use Async logger with Info (or lower) levels if performance is a concern.
+     & change the kind to Standard and Debug|Trace log levels when investigating an issue.
+
+      {$IFDEF DEBUG}
+        InitializeLogger(LOG_KIND_STANDARD, LL_DEBUG);
+      {$ELSE}
+        InitializeLogger(LOG_KIND_ASYNC, LL_INFO);
+      {$ENDIF }
+
+  However, In most cases logging is only a minor part of the processes and consequently, less race conflicts sharing the
+  same file. Meaning, the Standard logger is fast enough and a bit safer to indicate up-to-date values.
+
+  Note: All file loggers use the same "LogFile" Stream to safely update the log file.
+     -> more details in LogFileStream.pas
+
+
+************************************************************************************************************************
+Developer: Cosmin Frentiu
+Licence:   GPL v3
+Homepage:  https://github.com/CosminFr/ZenLogger
+***********************************************************************************************************************)
 interface
 
 uses
-  Winapi.Windows, System.SysUtils, System.IOUtils, System.Types,
-  ZenLogger, BaseLogger;
+  Classes, Windows, SysUtils, IOUtils, Types, SyncObjs, Threading,
+  ZenLogger, BaseLogger, LogFileStream;
 
 type
   TFileLogConfig = class(TLogConfig)
   private
-    fLogName   : string;
-    fLogPath : string;
-    fDaysKeep  : Integer;
+    fLogName  : string;
+    fLogPath  : string;
+    fDaysKeep : Integer;
   public
     constructor Create(const aLogLevel: Integer = LL_INFO; const aLogName: string = '');
 
-    property  LogPath : String  read fLogPath write fLogPath;
-    property  LogName   : String  read fLogName   write fLogName;
-    property  DaysKeep  : Integer read fDaysKeep  write fDaysKeep;
+    property  LogPath  : String  read fLogPath write fLogPath;
+    property  LogName  : String  read fLogName   write fLogName;
+    property  DaysKeep : Integer read fDaysKeep  write fDaysKeep;
   end;
-//  TLogConfigClass = class of TLogConfig;
 
   TFileLogger = class(TAbstractLogger, IFileLogger)
   private
@@ -37,27 +76,30 @@ type
     {$ENDREGION}
 
   protected
+    fLogStream : TLogFileStream;
+
     procedure LoadConfig(const aConfig: TLogConfig = nil); override;
     /// WriteLog - save line to the log file
     procedure WriteLog(const Line:string); override;
     function  GetLogFileName: string; virtual;
-
-    procedure OpenFile(var aLogFile : TextFile);
-    procedure CloseFile(var aLogFile : TextFile);
+    procedure CheckLogName;
 
     function  InternalDebugLog: ILogger; override;
     procedure DeleteOldFiles;
   public
-//    constructor Create(const aLogName: string); virtual;
-//    constructor Create(const aConfig: TLogConfig = nil); override;
-//    destructor  Destroy; override;
+    constructor Create(const aConfig: TLogConfig = nil); override;
+    destructor  Destroy; override;
 
     class function LogKindName: String; override;
+
+    procedure Flush; override;
 
     property  LogPath     : String  read GetLogPath     write SetLogPath;
     property  LogName     : String  read GetLogName     write SetLogName;
     property  LogFileName : String  read GetLogFileName;
     property  DaysKeep    : Integer read GetDaysKeep    write SetDaysKeep;
+
+    property  Stream      : TLogFileStream read fLogStream;
   end;
   TFileLoggerClass = class of TFileLogger;
 
@@ -80,6 +122,18 @@ end;
 
 { TFileLogger }
 
+constructor TFileLogger.Create(const aConfig: TLogConfig);
+begin
+  inherited;
+  fLogStream := nil;
+end;
+
+destructor TFileLogger.Destroy;
+begin
+  FreeAndNil(fLogStream);
+  inherited;
+end;
+
 procedure TFileLogger.LoadConfig(const aConfig: TLogConfig = nil);
 var
   AppName : String;
@@ -94,9 +148,7 @@ begin
     fLogPath  := Default_LogPath;
     fDaysKeep := Default_DaysKeep;
   end;
-
   AppName    := GetModuleName(HInstance);
-
   if fLogName = '' then
     fLogName := TPath.GetFileNameWithoutExtension(AppName);
 
@@ -106,6 +158,7 @@ begin
       fLogPath := IncludeTrailingPathDelimiter(TPath.GetHomePath()) + PRODUCT_NAME;
   end;
   ForceDirectories(fLogPath);
+  TTask.Run(DeleteOldFiles);
 end;
 
 class function TFileLogger.LogKindName: String;
@@ -146,78 +199,48 @@ end;
 procedure TFileLogger.SetLogPath(const Value: String);
 begin
   fLogPath := Value;
+  CheckLogName;
 end;
 
 procedure TFileLogger.SetLogName(const Value: String);
 begin
   fLogName := Value;
+  CheckLogName;
 end;
 {$ENDREGION}
 
-procedure TFileLogger.OpenFile(var aLogFile : TextFile);
-var
-  Count   : Integer;
-  ioRes   : Integer;   //copy of IOResult so it can be logged.
-begin
-  System.AssignFile(aLogFile, LogFileName);
-  {$I-}
-  //Keep trying to open for writing
-  Count := 0;
-  while Count < 1000 do begin
-    System.Append(aLogFile);
-    ioRes := IOResult;
-    case ioRes of
-      0   : Break;
-      2   : begin                                //2   = File not found
-              System.Rewrite(aLogFile);
-              {$I+}
-              try
-                DeleteOldFiles;            //"new day" -> time for cleanup...
-              except
-                on E:Exception do
-                  InternalDebugLog.Debug('Error deleting old files: %s', [E.Message]);
-              end;
-              {$I-}
-              Continue;
-            end;
-      3   : ForceDirectories(LogPath);            //3   = Path not found
-      32  : Sleep(Count *10);                     //32  = Sharing violation
-      102 : AssignFile(aLogFile, LogFileName);    //102 = File not assigned.
-      else  Sleep(1);
-    end;
-    Inc(Count);
-    if ioRes <> 32 then  //skip debug logging an expected condition.
-      InternalDebugLog.Debug('Trying to Append... IOResult=%d; Attempt=%d; Class=%s; Obj=%d', [ioRes, Count, ClassName, Integer(Self)]);
-  end;
-  {$I+}
-end;
-
 procedure TFileLogger.WriteLog(const Line: string);
-var
-  LogFile : Text;
-  ioRes   : Integer;
 begin
-  OpenFile(LogFile);
-  {$I-}
-  //Write line
-  Writeln(LogFile, Line);
-  ioRes := IOResult;
-  if ioRes <> 0 then
-    InternalDebugLog.Debug('Trying to Write... IOResult=%d; Obj=%d; Line=%s', [ioRes, Integer(Self), Line]);
-  {$I+}
-  CloseFile(LogFile);
+  CheckLogName;
+  Stream.BeginAccess;
+  try
+    Stream.WriteLine(Line);
+  finally
+    Stream.EndAccess;
+  end;
 end;
 
-procedure TFileLogger.CloseFile(var aLogFile : TextFile);
-var
-  ioRes : Integer;
+procedure TFileLogger.Flush;
 begin
-  {$I-}
-  System.CloseFile(aLogFile);
-  ioRes := IOResult;
-  if ioRes <> 0 then
-    InternalDebugLog.Debug('Trying to CloseFile... IOResult=%d', [ioRes]);
-  {$I+}
+  if Assigned(fLogStream) then
+    fLogStream.Flush;
+end;
+
+procedure TFileLogger.CheckLogName;
+var
+  lName : String;
+begin
+  lName := GetLogFileName;
+  if Assigned(fLogStream) and (fLogStream.FileName <> lName) then begin
+    //New file (maybe new day?)
+    InternalDebugLog.Debug('New FileName "%s" detected. Closing old file "%s"', [lName, fLogStream.FileName]);
+    FreeAndNil(fLogStream);
+    TTask.Run(DeleteOldFiles);
+  end;
+  if not Assigned(fLogStream) then begin
+    fLogStream := TLogFileStream.Create(lName);
+    InternalDebugLog.Debug('Log Stream created for "%s".', [lName]);
+  end;
 end;
 
 procedure TFileLogger.DeleteOldFiles;
@@ -225,13 +248,18 @@ var
   FileName  : string;
   OlderThan : TDateTime;
 begin
-  OlderThan := Date() - DaysKeep;
-  for FileName in TDirectory.GetFiles(fLogPath, '*.log') do
-    if TFile.GetCreationTime(FileName) < OlderThan then
-    try
-      TFile.Delete(FileName);
-    except
-    end;
+  try
+    OlderThan := Date() - DaysKeep;
+    for FileName in TDirectory.GetFiles(fLogPath, '*.log') do
+      if TFile.GetCreationTime(FileName) < OlderThan then
+      try
+        TFile.Delete(FileName);
+      except
+      end;
+  except
+    on E: Exception do
+      InternalDebugLog.Error('Error deleting old files: %s', E);
+  end;
 end;
 
 function TFileLogger.InternalDebugLog: ILogger;
@@ -256,41 +284,4 @@ end;
 
 
 end.
-
-//IOResult error codes:
-//  2 - File not found.
-//  3 - Path not found.
-//  4 - Too many open files.
-//  5 - Access denied.
-//  6 - Invalid file handle.
-// 12 - Invalid file-access mode.
-// 13 - Permission denied
-// 15 - Invalid disk number.
-// 16 - Cannot remove current directory.
-// 17 - Cannot rename across volumes.
-// 20 - Not a directory
-// 21 - Is a directory
-// 32 - Sharing violation
-//100 - Error when reading from disk.
-//101 - Error when writing to disk.
-//102 - File not assigned.
-//103 - File not open.
-//104 - File not opened for input.
-//105 - File not opened for output.
-//106 - Invalid number.
-//150 - Disk is write protected.
-//151 - Unknown device.
-//152 - Drive not ready.
-//153 - Unknown command.
-//154 - CRC check failed.
-//155 - Invalid drive specified..
-//156 - Seek error on disk.
-//157 - Invalid media type.
-//158 - Sector not found.
-//159 - Printer out of paper.
-//160 - Error when writing to device.
-//161 - Error when reading from device.
-//162 - Hardware failure.
-
-
 

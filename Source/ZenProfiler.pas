@@ -3,67 +3,56 @@ unit ZenProfiler;
 
  Zen Profiler - used with ITraceLogger when the LogLevel is Trace.
 
-  The unit introduces a simple logger interface.
 
-  Logger Kind
+  IProfileEntry
   ================
-  See LogManager factory unit how to initialize the correct "Kind" of logger for your purposes.
-  First 3 are implicit (see BaseLogger), while others are only available if included in the project (showing how to add further custom loggers)
-    * Null       - "Empty" logger = ignores all requests
-    * Standard   - "Default" (Base) logger = simple file logger & base class for all other loggers
-    * Console    - command line programs -> log to the console output | (otherwise) debug messages in Delphi GUI
-    + Async      - decouple writing the log file from your application (using TTask from Parallel Programming Library)
-    + ThreadSafe - adds thread info to standard message context (aka time & log level)
-    + Mock       - TBD - for unit testing
+  Used by Trace logger to capture the Elapsed time traced.
+  May also be used directly from TZenProfiler.Enter(aName).
+  Associates the <aName> with a Stopwatch (System.Diagnostics). It has functions to control the it:
+    * Reset
+    * Start
+    * Stop
+    * IsRunning
+  and the same properties to show the elapsed time as the Stopwatch
+    * Elapsed             : TTimeSpan
+    * ElapsedMilliseconds : Int64
+    * ElapsedTicks        : Int64
+    +++ ElapsedAsText - shows the elapsed time in a user friendly manner
 
-  Logger Interface
+  TTraceLogger
   ================
-  There are five log levels, each with a specific method to log a message text:
-    * Error    - Indicates a serious problem that has caused a failure in part of the application (e.g. exceptions or critical failures)
-    * Warning  - Highlights a potential issue or unexpected behavior that isn't immediately harmful but may lead to problems
-    * Info     - Provides general operational messages that track the application’s progress
-    * Debug    - Gives detailed diagnostic information useful for debugging during development (e.g. internal state changes, variable values)
-    * Trace    - The most detailed level, showing step-by-step execution or fine-grained application flow, typically used for in-depth troubleshooting
-    ~~~ (each of the above) has an overloaded version with extra Args: ~~~(Msg, Args) = ~~~(Format(Msg, Args))
-    * Flush    - push in memory data to the log file (important for Async Kind)
-
-  Getters & Setters for the available properties:
-    * LogPath  - Specifies the directory path where log files will be stored
-    * LogName  - Sets the base name of the log file. The actual log file with include the date (e.g. LogName_2025-05-23.log).
-    * LogLevel - Determines the level of messages to be logged. Messages above this level will be ignored.
-    * DaysKeep - Indicates how many days log files should be retained before being deleted (to help manage disk space).
-
-
-  Logger Config
-  ================
-  Different loggers may need different details. As a starting base class TLogConfig has only LogLevel.
-  However file loggers will need a name, path & retention period (see TFileLogConfig in FileLogger.pas).
-
-  This unit defines the settings required to initialize the global logger (which is assumed to be file based):
-    * Default_LogKind  : Integer;
-    * Default_LogName  : String;
-    * Default_LogPath  : String;
-    * Default_LogLevel : Integer;
-    * Default_DaysKeep : Integer;
-  Use InitializeLogger function at the start of your project to setup or directly set the values BEFORE using Log.
-
-
-  Trace Logger & Profiling
-  ========================
-  See ZenProfiler.pas for details.
   Trace Logger is a special kind of method logger that uses another logger to do the output.
+  See the ITraceLogger and create functions in ZenLogger.pas
     * GetTraceLogger(aProcName            ; aLogger = nil): ITraceLogger;
     * GetTraceLogger(aClassName, aProcName; aLogger = nil): ITraceLogger;
   If the "other" logger is not set, the global Log is assumed and used.
 
-  See "Demo/Sort Algorithms" for usage.
   There are 3 reasons to use this as a local logger in a procedure:
     * adds a "context" to the log message: [<ClassName>.]<ProcName>: <LogMessage>
     * (if LL_TRACE) adds Enter/Exit Trace messages (on create/destroy).
     * (if LL_TRACE) calculates the elapsed time in milliseconds & updates the profiler stats for that context
 
-  Note: Use GetTraceLogger(...).ForceProfile; to gather stats for the function regardless of the log level.
-      ~ This should be used with caution and only while needed.
+  Note: Use GetTraceLogger(...).Trace; to gather stats for the function regardless of the log level.
+
+
+  TZenProfiler
+  ================
+  Defined as "class singleton". There is no need to create instances. All functions should be accessed from class level.
+  See Trace Logger destructor for example. Any time the trace logger is cleaned up (on exiting the function) the time
+  spent from its creation is added to the profile statistics for that context.
+
+  Main functions:
+    * Add - Collects statistics about that context (Count, [Max|Min|Total] Times)
+        > TZenProfiler.Add(aContext, <Elapsed Milliseconds>);
+    * Enter - returns a IProfileEntry for direct use (without a Trace Logger).
+              Similarly, added to statistics when cleared/out of scope
+        > TZenProfiler.Enter(aName): IProfileEntry;
+    * Reset - cleans up all the statistics gathered till that point
+    * Report(aFileName) - saves the current statistics to the <aFileName>.
+        > TZenProfiler.Report - called automatically in the finalization section.
+                              - <no file name> => GetDefaultFileName = "<AppName>_Profile.txt"
+                              - entries are sorted by Total time (DESC)
+    * class constructor/destructor for setup & cleanup
 
 ************************************************************************************************************************
 Developer: Cosmin Frentiu
@@ -75,11 +64,28 @@ interface
 uses
   Winapi.Windows, System.SysUtils, System.Classes, System.SyncObjs, System.Types,
   System.Generics.Collections, System.Generics.Defaults,
-//  System.Threading,
-  System.Diagnostics,
+  System.Diagnostics, System.TimeSpan,
   ZenLogger, BaseLogger;
 
 type
+  IProfileEntry = interface
+    procedure Reset;
+    procedure Start;
+    procedure Stop;
+
+    function IsRunning: Boolean;
+
+    function GetElapsed: TTimeSpan;
+    function GetElapsedMilliseconds: Int64;
+    function GetElapsedTicks: Int64;
+    function GetElapsedAsText: String;
+
+    property Elapsed: TTimeSpan read GetElapsed;
+    property ElapsedMilliseconds: Int64 read GetElapsedMilliseconds;
+    property ElapsedTicks: Int64 read GetElapsedTicks;
+    property ElapsedAsText: String read GetElapsedAsText;
+  end;
+
   TTraceLogConfig = class(TLogConfig)
   private
     fLogger : ILogger;
@@ -93,20 +99,16 @@ type
   private
     fLogger  : ILogger;
     fContext : String;
-    fProfile : Boolean;
+    fProfile : IProfileEntry;
     fTime    : TStopwatch;
   protected
     procedure WriteLog(const Line:string); override;
     procedure WriteLogLine(const LineType:TLogLineType; const MsgText :string); override;
     function  Trace: ILogger;
-    procedure DoStartTrace;
-    procedure DoStopTrace;
   public
     constructor Create(const aContext: string; const aLogger: ILogger = nil); reintroduce;
     destructor  Destroy; override;
   end;
-
-
 
   TZenProfiler = class
   private
@@ -131,13 +133,40 @@ type
     class procedure Add(const aKey: String; const aTime: Int64);
     class procedure Report(aFileName: String = '');
     class procedure Reset;
+    class function  Enter(const aName: String): IProfileEntry;
   end;
 
 
 implementation
 
 uses
-  System.IOUtils, System.TimeSpan;
+  System.IOUtils;
+
+type
+  TProfileEntry = class(TAbstractLogger, IProfileEntry)
+  private
+    fName : String;
+    fTime : TStopwatch;
+    function GetElapsed: TTimeSpan;
+    function GetElapsedMilliseconds: Int64;
+    function GetElapsedTicks: Int64;
+    function GetElapsedAsText: String;
+  public
+    constructor Create(const aName: string);
+    destructor  Destroy; override;
+
+    procedure Reset;
+    procedure Start;
+    procedure Stop;
+    function  IsRunning: Boolean;
+
+    property Elapsed: TTimeSpan read GetElapsed;
+    property ElapsedMilliseconds: Int64 read GetElapsedMilliseconds;
+    property ElapsedTicks: Int64 read GetElapsedTicks;
+    property ElapsedAsText: String read GetElapsedAsText;
+  end;
+
+
 
 { TTraceLogConfig }
 
@@ -156,46 +185,38 @@ begin
   if not Assigned(fLogger) then
     fLogger := ZenLogger.Log();
   fLogLevel := fLogger.LogLevel;
-  fProfile := (fLogLevel >= LL_TRACE);
-  DoStartTrace;
+  if fLogLevel >= LL_TRACE then begin
+    fLogger.Trace('>>> %s', [fContext]);
+    fProfile := TZenProfiler.Enter(aContext);
+  end;
 end;
 
 destructor TTraceLogger.Destroy;
 begin
-  DoStopTrace;
+  if Assigned(fProfile) then
+    fProfile.Stop;
+  if fLogLevel >= LL_TRACE then begin
+    if Assigned(fProfile) then
+      fLogger.Trace('<<< %s (%s)', [fContext, fProfile.ElapsedAsText])
+    else
+      fLogger.Trace('<<< %s', [fContext]);
+  end;
+  fProfile := nil;
   inherited;
-end;
-
-procedure TTraceLogger.DoStartTrace;
-begin
-  if fProfile then begin
-    fTime := TStopwatch.StartNew;
-    fLogger.Trace('>>> %s', [fContext]);
-  end;
-end;
-
-procedure TTraceLogger.DoStopTrace;
-begin
-  if fProfile then begin
-    fTime.Stop;
-    fLogger.Trace('<<< %s (%d ms)', [fContext, fTime.ElapsedMilliseconds]);
-    TZenProfiler.Add(fContext, fTime.ElapsedMilliseconds);
-  end;
 end;
 
 function TTraceLogger.Trace: ILogger;
 begin
-  if not fProfile then begin
-    fProfile := True;
-    DoStartTrace;
-  end;
+  if not Assigned(fProfile) then
+    fProfile := TZenProfiler.Enter(fContext);
+
   Result := Self;
 end;
 
 procedure TTraceLogger.WriteLog(const Line: string);
 begin
-  //
-  InternalDebugLog.Error('Should not come here!!! (Class=%s) %s', [ClassName, Line]);
+  Assert(False, 'TTraceLogger should use WriteLog from the associated logger!');
+  InternalDebugLog.Error('TTraceLogger.WriteLog - Should not come here!!! %s', [Line]);
 end;
 
 procedure TTraceLogger.WriteLogLine(const LineType: TLogLineType; const MsgText: string);
@@ -234,6 +255,11 @@ class procedure TZenProfiler.DoValueNotify(Sender: TObject; const Value: TStatsD
 begin
   if Assigned(Value) and (Action = cnRemoved) then
     Value.Free;
+end;
+
+class function TZenProfiler.Enter(const aName: String): IProfileEntry;
+begin
+  Result := TProfileEntry.Create(aName);
 end;
 
 class function TZenProfiler.GetDefaultFileName: String;
@@ -322,6 +348,76 @@ end;
 function TZenProfiler.TTotalTimeComparer.Compare(const Left, Right: TStatsData): Integer;
 begin
   Result := Right.TotalTime - Left.TotalTime;
+end;
+
+{ TProfileEntry }
+
+constructor TProfileEntry.Create(const aName: string);
+begin
+  inherited Create;
+  fName := aName;
+  fTime := TStopwatch.StartNew;
+end;
+
+destructor TProfileEntry.Destroy;
+begin
+  fTime.Stop;
+  TZenProfiler.Add(fName, fTime.ElapsedMilliseconds);
+  inherited;
+end;
+
+function TProfileEntry.GetElapsed: TTimeSpan;
+begin
+  Result := fTime.Elapsed;
+end;
+
+function TProfileEntry.GetElapsedAsText: String;
+var
+  lTicks : Int64;
+begin
+  lTicks := GetElapsedTicks;
+  if lTicks < 2*TTimeSpan.TicksPerMillisecond then
+    Result := Format('%.3f ms', [lTicks / TTimeSpan.TicksPerMillisecond])
+  else if lTicks < TTimeSpan.TicksPerSecond then
+    Result := Format('%d ms', [lTicks div TTimeSpan.TicksPerMillisecond])
+  else if lTicks < TTimeSpan.TicksPerMinute then
+    Result := Format('%.3f sec', [lTicks / TTimeSpan.TicksPerSecond])
+  else if lTicks < TTimeSpan.TicksPerHour then  //minutes not hours
+    Result := FormatDateTime('nn:ss mins', lTicks/TTimeSpan.TicksPerDay)
+  else if lTicks < TTimeSpan.TicksPerDay then
+    Result := FormatDateTime('hh:nn:ss hours', lTicks/TTimeSpan.TicksPerDay)
+  else
+    Result := GetElapsed.ToString;  //more than a day... use the TTimeSpan.ToString
+end;
+
+function TProfileEntry.GetElapsedMilliseconds: Int64;
+begin
+  Result := fTime.ElapsedMilliseconds;
+end;
+
+function TProfileEntry.GetElapsedTicks: Int64;
+begin
+  Result := fTime.ElapsedTicks;
+end;
+
+function TProfileEntry.IsRunning: Boolean;
+begin
+  Result := fTime.IsRunning;
+end;
+
+procedure TProfileEntry.Reset;
+begin
+  fTime.Reset;
+end;
+
+procedure TProfileEntry.Start;
+begin
+  fTime.Start;
+end;
+
+procedure TProfileEntry.Stop;
+begin
+  fTime.Stop;
 end;
 
 initialization
