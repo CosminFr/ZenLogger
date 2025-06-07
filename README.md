@@ -26,35 +26,13 @@ begin
 end;
 ```
 > [!NOTE]
-> `InitializeLogger` is optional, used to update the [`Default log configuration`](#%EF%B8%8F-configuration).
+> `InitializeLogger` is optional, used to update the *Default Log [Configuration](#%EF%B8%8F-configuration)*.
 
 Each log level has an overload with `Format` support:
 
 ```pascal
 Log.Warning('Missing configuration for %s', [ConfigName]);
 ```
-
-
-## 🛠️ Configuration
-
-Global logger is initialized on first use, or via:
-
-```
-procedure InitializeLogger(LogKind, LogLevel, LogName, LogPath, DaysKeep);
-```
-
-All parameters are optional. With no params, it's used to explicitly initialize the global logger using the default configuration:
-
-| Configuration Variable   | Default Value  | Description                                                  |
-|--------------------------|----------------|--------------------------------------------------------------|
-| Default_LogKind          | 1 = *Standard* | The basic file logger. Thread safe, synchronous logging.     |
-| Default_LogLevel         | 3 = *Info*     | see [Log Levels](#-log-levels).                              |
-| Default_LogName          | '' <empty>     | if empty - use the file name from `ModuleName` (app|library) |
-| Default_LogPath          | '' <empty>     | if empty - use the path as above.                            |
-| Default_DaysKeep         | 30             | Keep for a month, just in case there are delays in reporting issues. |
-
-Set these before logging begins, or call `ReleaseLogger` to force re-initialization from updated defaults.
-
 
 
 ## 📈 Log Levels
@@ -67,9 +45,7 @@ Set these before logging begins, or call `ReleaseLogger` to force re-initializat
 | *Debug*   | Gives detailed diagnostic information useful for debugging (e.g. internal state changes, variable values) |
 | *Trace*   | The most detailed level, showing step-by-step execution or fine-grained application flow, typically used for in-depth troubleshooting |
 
-All levels have a `.Fmt(...)` overload and are filtered by the active `LogLevel`.
 
-____
 
 ## 🧱 Logger Kinds
 
@@ -81,6 +57,7 @@ ____
 | *Async*       | Queues messages and writes in background using `TTask`.                     |
 | *ThreadSafe*  | Adds mutex locking and thread ID to logs. Useful for concurrency debugging. |
 | *Mock*        | Used for unit testing where the a log file is not needed. Instead, the mock logger fires events  |
+
 
 #### 🚫 Null Logger
 
@@ -94,6 +71,8 @@ The `Null Logger` is an easy way to disable all logs from the application.
 - File name: `{LogName}_yyyy-mm-dd.log`
 - Auto-deletes files older than `DaysKeep`
 - Safe for general use and crash diagnostics
+
+`TFileLogger` is the base class for all file loggers.
 
 #### 🖥 Console Logger
 
@@ -127,26 +106,62 @@ Instead or writing logs, it triggers those registered events to validate what it
 `ITraceLogger` wraps a method or scope to log execution entry, exit, and duration.
 
 ```pascal
-procedure DoWork;
-var Log: ILogger;
+procedure TSortThread.ArraySwap(I, J: Integer);
 begin
-  Log := GetTraceLogger('DoWork');
-  // Do stuff...
+  var Log := GetTraceLogger(ClassName, 'ArraySwap', fLogger).Trace;
+  Log.Debug('Swapping %d, %d', [I, J]);
+  // Do the swap...
 end;
 ```
 
 When `LogLevel = LL_TRACE`, adds:
 
-- Enter/Exit "Trace" log lines `>>> DoWork` and `<<< DoWork` 
+- Enter/Exit "Trace" log lines
 - Elapsed time
 - Profiling stats
 
->20:15:30.350 TRACE..... >>> TQuickSort.ArraySwap  
->20:15:30.350 TRACE..... TQuickSort.ArraySwap: Swapping 735, 998  
->20:15:30.350 TRACE..... <<< TQuickSort.ArraySwap (2 ms)  
->20:15:30.350 TRACE..... <<< TQuickSort.Execute (31.279 sec)  
+```
+20:15:30.350 TRACE..... >>> TQuickSort.ArraySwap  
+20:15:30.350 DEBUG..... TQuickSort.ArraySwap: Swapping 735, 998  
+20:15:30.350 TRACE..... <<< TQuickSort.ArraySwap (2 ms)  
+20:15:30.350 TRACE..... <<< TQuickSort.Execute (31.279 sec)  
+```
 
 🔬 Tip: Use `.Trace` to track performance even when `LogLevel` is lower.
+```
+Function: TQuickSort.Execute
+  Exec Count: 1
+  Total Time: 31.279 s
+Function: TQuickSort.ArraySwap
+  Exec Count: 2668
+  Total Time: 9.095 s
+    Max Time: 17 ms
+    Min Time: 3 ms
+    Avg Time: 3 ms
+```
+
+---
+
+
+## 🛠️ Configuration
+
+Global logger is initialized on first use, or via:
+
+```
+procedure InitializeLogger(LogKind, LogLevel, LogName, LogPath, DaysKeep);
+```
+
+All parameters are optional. With no params, it's used to explicitly initialize the global logger using the default configuration:
+
+| Configuration Variable   | Default Value  | Description                                                  |
+|--------------------------|----------------|--------------------------------------------------------------|
+| Default_LogKind          | 1 = *Standard* | The basic file logger. Thread safe, synchronous logging.     |
+| Default_LogLevel         | 3 = *Info*     | see [Log Levels](#-log-levels).                              |
+| Default_LogName          | '' <empty>     | if empty - use the file name from `ModuleName` (app|library) |
+| Default_LogPath          | '' <empty>     | if empty - use the path as above.                            |
+| Default_DaysKeep         | 30             | Keep for a month, just in case there are delays in reporting issues. |
+
+Set these before logging begins, or call `ReleaseLogger` to force re-initialization from updated defaults.
 
 ---
 ## 🧬 Demo Projects
