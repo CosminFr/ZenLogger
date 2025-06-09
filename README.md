@@ -1,15 +1,15 @@
 # 🧾 ZenLogger
 
-A lightweight, extensible, and high-performance logging framework for Delphi, built with simplicity, traceability, and performance in mind.
+A lightweight, extensible, and thread-safe logging implementation for Delphi applications, built with simplicity, traceability, and performance in mind.
 
-ZenLogger introduces a flexible `ILogger` interface and multiple interchangeable logger implementations, suitable for anything from simple CLI tools to complex multithreaded GUI applications.
+ZenLogger introduces a clean `ILogger` interface and multiple interchangeable logger implementations, suitable for anything from simple CLI tools to complex multithreaded GUI applications.
 
 #### 🚀 Features
 
 - Five log levels: *Error*, *Warning*, *Info*, *Debug*, *Trace*
 - Pluggable logger kinds: *Null*, *Standard*, *Console*, *Async*, *ThreadSafe*, *Mock*
 - File rotation with retention policy
-- Trace logger with profiling support
+- Trace logger extension with profiling support
 - Sync and async implementations
 - Thread-safe with minimal file locking
 - Centralized initialization via `LogManager`
@@ -17,22 +17,72 @@ ZenLogger introduces a flexible `ILogger` interface and multiple interchangeable
 
 ## 🔧 Usage Overview
 
+Copy source files to your project, include ZenLogger in uses clause and start using it.  
+
+**Using [Default Configuration](#%EF%B8%8F-configuration)**
 ```pascal
 uses ZenLogger;
 
+procedure FooBar()
 begin
-  InitializeLogger(LOG_KIND_ASYNC, LL_INFO);
-  Log.Info('Application started.');
+  Log.Info('FooBar started.');
+  try
+    ...
+    Log.Debug('Stage values for FooBar: Text="%s"; Index=%d', [sText, i]);
+    ...
+  except
+    on E: Exception do begin
+      Log.Error('Error in FooBar: ', E);
+      raise; //log but don't ignore it!
+    end;
 end;
 ```
-> [!NOTE]
-> `InitializeLogger` is optional, used to update the *Default Log [Configuration](#%EF%B8%8F-configuration)*.
 
-Each log level has an overload with `Format` support:
 
+**Your preferred Configuration**  
+To use a different logger within your project, make sure the logger is included in the project (*.dpr) file and set the default values before using the *Log.\** functions. See [🛠️ Configuration](#%EF%B8%8F-configuration) for details:
 ```pascal
-Log.Warning('Missing configuration for %s', [ConfigName]);
+uses ZenLogger, AsyncLogger, ...
+
+begin
+  InitializeLogger(LOG_KIND_ASYNC, LL_DEBUG, '', '', 1);
+  Log.Info('Application started.');
+  ...
+end;
 ```
+
+> [!TIP]
+> Have "Logging" options included with your project settings instead of hardcoded values! Especially LogLevel & LogPath!  
+> For inspiration, look at [ZenConfig](https://github.com/CosminFr/ZenConfig) demo for LogConfig.
+
+
+**Use Trace Logger**  
+To automatically add ClassName & MethodName in every log call, use a localized "trace" logger:
+```pascal
+procedure TFoo.Bar;
+var Log: ILogger;
+begin
+  Log := GetTraceLogger(ClassName, 'Bar');
+  Log.Info('Step 1 - ...');
+  // Code
+end;
+```
+Every log line above will include `TFoo.Bar: ` before the log message. Additionally, if the log level is *Trace*, the `Trace Logger` includes *Enter*/*Exit* trace messages. See [🧭 Trace Logger & Profiling](#-trace-logger--profiling) for details:
+
+
+#### Why ZenLogger?
+There are not many new projects started with Delphi and old ones probably already have their own way of logging, which can be quite difficult to change. So why even consider a new *logger*?  
+The simple answer is that you would not be even reading this if you are happy with that logger!
+
+However, if you are considering a new logger, there are a few different ways to adapt your code:
+- *Extend the ILogger interface*: Add whatever "LogMsg" functions are used everywhere in the code as an extended ILooger interface and include ZenLogger in `uses` clause.
+  In time, the code can use the clean ILogger interface (or not). Either way, they would both lead to the same log.
+> [!Tip]
+> Remove the old units to ensure there is only one log implementation. Otherwise, it could become very messy and confusing.
+
+- *Internally use the new Logger*: Replace the old logging implementation with calls to the new ZenLogger. As the ZenLogger is initialized, you could also slowly change the code to directly use the ZenLogger (or not).
+
+If unsure, or prefer an external consultant to handle the conversion, feel free to contact me for a quote at: contact@zendev4d.com. 
 
 
 ## 📈 Log Levels
