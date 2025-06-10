@@ -40,7 +40,8 @@ end;
 
 
 **Your preferred Configuration**  
-To use a different logger within your project, make sure the logger is included in the project (*.dpr) file and set the default values before using the *Log.\** functions. See [🛠️ Configuration](#%EF%B8%8F-configuration) for details:
+To use a different logger within your project, make sure the logger is included in the project (*.dpr) file and set the default values before using the *Log.\** functions.
+
 ```pascal
 uses ZenLogger, AsyncLogger, ...
 
@@ -52,8 +53,8 @@ end;
 ```
 
 > [!TIP]
-> Have "Logging" options included with your project settings instead of hardcoded values! Especially LogLevel & LogPath!  
-> For inspiration, look at [ZenConfig](https://github.com/CosminFr/ZenConfig) demo for LogConfig.
+> Have "Logging" options included with your project settings instead of hardcoded values. <br>
+> Especially *LogLevel* and *LogPath*! Your clients should be able to change them without asking for a special build.
 
 
 **Use Trace Logger**  
@@ -67,20 +68,29 @@ begin
   // Code
 end;
 ```
-Every log line above will include `TFoo.Bar: ` before the log message. Additionally, if the log level is *Trace*, the `Trace Logger` includes *Enter*/*Exit* trace messages. See [🧭 Trace Logger & Profiling](#-trace-logger--profiling) for details:
+Every log line above will include `TFoo.Bar: ` as a "context" for the log message. This is especialy useful in complex inheritance cases.
+
+Additionally, it automatically handles the *Enter*/*Exit* trace messages (when log level is *Trace*). See [🧭 Trace Logger & Profiling](#-trace-logger--profiling) for details.
 
 
 #### Why ZenLogger?
-There are not many new projects started with Delphi and old ones probably already have their own way of logging, which can be quite difficult to change. So why even consider a new *logger*?  
-The simple answer is that you would not be even reading this if you are happy with that logger!
+There are almost as many logger implementations as there are large projects or frameworks. Why adding another one?
 
-However, if you are considering a new logger, there are a few different ways to adapt your code:
-- *Extend the ILogger interface*: Add whatever "LogMsg" functions are used everywhere in the code as an extended ILooger interface and include ZenLogger in `uses` clause.
+Some are too complex, or require installation (services or DLLs), or are not thread-safe, or not playing nice locking the files and/or crashing the whole app if tampering with the log file in notepad.
+
+The bottom line is if you have a good logger, you are not reading this and ZenLogger is not for you.
+
+ZenLogger was made to be simple to use, yet fast, thread safe and customizable. Use it "as is" or extend to your specific needs.
+
+#### Can ZenLogger be used with old code?
+There are many different ways to adapt to old code. Some ideas:
+- *Extend the ILogger interface*: Create an extension of ILooger interface with whatever "LogMsg" functions are used everywhere in the code and implement the new logger kind. It's quite easy, just format the line as needed and let the base class handle the logging.
   In time, the code can use the clean ILogger interface (or not). Either way, they would both lead to the same log.
 > [!Tip]
 > Remove the old units to ensure there is only one log implementation. Otherwise, it could become very messy and confusing.
 
 - *Internally use the new Logger*: Replace the old logging implementation with calls to the new ZenLogger. As the ZenLogger is initialized, you could also slowly change the code to directly use the ZenLogger (or not).
+- *Use LogFileStream directly*: Ignore most of the ZenLogger boilerplate and change the log file access from previous logging implementation. Open source code advantage. You can easily see and emulate the internals of ZenLogger file access.
 
 If unsure, or prefer an external consultant to handle the conversion, feel free to contact me for a quote at: contact@zendev4d.com. 
 
@@ -114,7 +124,7 @@ If unsure, or prefer an external consultant to handle the conversion, feel free 
 The `Null Logger` is an easy way to disable all logs from the application. 
 
 
-#### 📂 `Standard` File Logging
+#### 📂 "Standard" File Logging
 
 `TFileLogger` is synchronous, thread-safe and reliable logging to file.
 
@@ -130,17 +140,17 @@ For CLI *(command-line interface)* programs that rely on console output, `TConso
 Otherwise, it uses `OutputDebugString` API function sending logs to a *debugger*.
 
 
-#### ⚡ `TAsyncLogger`
+#### ⚡ Async Logger
 
 - Uses a thread-safe queue + background `TTask` to write logs
 - Significantly faster than standard logger
 - Log file written in batches
 
-#### 🧵 `TThreadSafeLogger`
-
+#### 🧵 Thread-Safe Logger
+The name is a misnomer, as all other loggers are thread-safe. This was an early attempt, but remained due its usefulness when debugging multi-threaded apps.
 - Adds `TH-<ThreadID>` to each log entry
-- Enforces exclusive file access using a mutex
 - Better visibility when diagnosing thread-related issues
+- Enforces exclusive file access using a mutex
 
 #### 🧪 Mock Logger
 
@@ -213,11 +223,14 @@ All parameters are optional. With no params, it's used to explicitly initialize 
 
 Set these before logging begins, or call `ReleaseLogger` to force re-initialization from updated defaults.
 
+> [!Note]
+> It make more sense to read these from your application configuration (file/registry).
+> Your clients should be able to set the retention period, location and log level. Turn it down to *Warnings* and *Errors*, or turn it up to *Debug* (or *Trace*) when investigating some issues.
+
 ---
 ## 🧬 Demo Projects
 
 Check the `/Demo` folder:
-
 - `Sort Algorithms`: shows `TraceLogger` usage
 - `Multi Thread`: compares logger kinds side-by-side
 
