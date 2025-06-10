@@ -213,19 +213,19 @@ procedure InitializeLogger(LogKind, LogLevel, LogName, LogPath, DaysKeep);
 
 All parameters are optional. With no params, it's used to explicitly initialize the global logger using the default configuration:
 
-| Configuration Variable   | Default Value  | Description                                                  |
-|--------------------------|----------------|--------------------------------------------------------------|
-| Default_LogKind          | 1 = *Standard* | The basic file logger. Thread safe, synchronous logging.     |
-| Default_LogLevel         | 3 = *Info*     | see [Log Levels](#-log-levels).                              |
-| Default_LogName          | '' <empty>     | if empty - use the file name from `ModuleName` (app|library) |
-| Default_LogPath          | '' <empty>     | if empty - use the path as above.                            |
+| Configuration Variable   | Default Value  | Description                                                     |
+|--------------------------|----------------|-----------------------------------------------------------------|
+| Default_LogKind          | 1 = *Standard* | The basic file logger. Thread safe, synchronous logging.        |
+| Default_LogLevel         | 3 = *Info*     | see [Log Levels](#-log-levels).                                 |
+| Default_LogName          | '' <empty>     | if empty - use the file name from `ModuleName` (app or library) |
+| Default_LogPath          | '' <empty>     | if empty - use the path as above.                               |
 | Default_DaysKeep         | 30             | Keep for a month, just in case there are delays in reporting issues. |
 
 Set these before logging begins, or call `ReleaseLogger` to force re-initialization from updated defaults.
 
 > [!Note]
-> It make more sense to read these from your application configuration (file/registry).
-> Your clients should be able to set the retention period, location and log level. Turn it down to *Warnings* and *Errors*, or turn it up to *Debug* (or *Trace*) when investigating some issues.
+> It make more sense to read these from your application configuration (file/registry).<br>
+> Your clients should be able to set the retention period, location and log level. Turn it down to *Warnings* and *Errors*, or turn it up to *Debug* (or *Trace*) while investigating issues.
 
 ---
 ## 🧬 Demo Projects
