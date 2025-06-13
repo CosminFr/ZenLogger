@@ -231,8 +231,11 @@ Set these before logging begins, or call `ReleaseLogger` to force re-initializat
 ## 🧬 Demo Projects
 
 Check the `/Demo` folder:
-- `Sort Algorithms`: shows `TraceLogger` usage
-- `Multi Thread`: compares logger kinds side-by-side
+- `Multi Thread`: evaluates the logger behaviour in a multi-threaded environment.
+    - chose the log kind, level & other settings
+    - decide if it should post to the same file or not
+    - test using same logger, or distinct loggers with same destination
+- `Sort Algorithms`: shows *Trace Logger* and *Profiler* usage
 
 ---
 
