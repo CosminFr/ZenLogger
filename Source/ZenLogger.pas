@@ -9,7 +9,7 @@ unit ZenLogger;
   First 3 are implicit (see BaseLogger), while others are only available if included in the project (showing how to add further custom loggers)
     * Null       - "Empty" logger = ignores all requests
     * Standard   - "Default" (Base) logger = simple file logger & base class for all other loggers
-    * Console    - command line programs -> log to the console output | (otherwise) debug messages in Delphi GUI
+    * Console    - command line programs -> log to the console output || debug messages in Delphi GUI
     + Async      - decouple writing the log file from your application (using TTask from Parallel Programming Library)
     + ThreadSafe - adds thread info to standard message context (aka time & log level)
     + Mock       - TBD - for unit testing
@@ -20,7 +20,7 @@ unit ZenLogger;
     * Error    - Indicates a serious problem that has caused a failure in part of the application (e.g. exceptions or critical failures)
     * Warning  - Highlights a potential issue or unexpected behavior that isn't immediately harmful but may lead to problems
     * Info     - Provides general operational messages that track the application’s progress
-    * Debug    - Gives detailed diagnostic information useful for debugging during development (e.g. internal state changes, variable values)
+    * Debug    - Gives detailed diagnostic information useful for debugging (e.g. internal state changes, variable values)
     * Trace    - The most detailed level, showing step-by-step execution or fine-grained application flow, typically used for in-depth troubleshooting
     ~~~ (each of the above) has an overloaded version with extra Args: ~~~(Msg, Args) = ~~~(Format(Msg, Args))
     * Flush    - push in memory data to the log file (important for Async Kind)
@@ -150,6 +150,12 @@ type
 
   ITraceLogger = interface(ILogger)
     function Trace: ILogger;
+    function NoTrace: ILogger;
+//TBC [Enter/Exit] with [input/output] debug values
+//    function Enter(const MsgText: String): ILogger;  overload;
+//    function Exit (const MsgText: String): ILogger;  overload;
+//    function Enter(const MsgText: String; const Args: array of const): ILogger; overload;
+//    function Exit (const MsgText: String; const Args: array of const): ILogger; overload;
   end;
 
 var

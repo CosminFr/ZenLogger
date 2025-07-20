@@ -327,40 +327,5 @@ end;
 
 end.
 
-//IOResult error codes:
-//  2 - File not found.
-//  3 - Path not found.
-//  4 - Too many open files.
-//  5 - Access denied.
-//  6 - Invalid file handle.
-// 12 - Invalid file-access mode.
-// 13 - Permission denied
-// 15 - Invalid disk number.
-// 16 - Cannot remove current directory.
-// 17 - Cannot rename across volumes.
-// 20 - Not a directory
-// 21 - Is a directory
-// 32 - Sharing violation
-//100 - Error when reading from disk.
-//101 - Error when writing to disk.
-//102 - File not assigned.
-//103 - File not open.
-//104 - File not opened for input.
-//105 - File not opened for output.
-//106 - Invalid number.
-//150 - Disk is write protected.
-//151 - Unknown device.
-//152 - Drive not ready.
-//153 - Unknown command.
-//154 - CRC check failed.
-//155 - Invalid drive specified..
-//156 - Seek error on disk.
-//157 - Invalid media type.
-//158 - Sector not found.
-//159 - Printer out of paper.
-//160 - Error when writing to device.
-//161 - Error when reading from device.
-//162 - Hardware failure.
-
 
 

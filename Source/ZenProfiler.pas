@@ -105,6 +105,7 @@ type
     procedure WriteLog(const Line:string); override;
     procedure WriteLogLine(const LineType:TLogLineType; const MsgText :string); override;
     function  Trace: ILogger;
+    function  NoTrace: ILogger;
   public
     constructor Create(const aContext: string; const aLogger: ILogger = nil); reintroduce;
     destructor  Destroy; override;
@@ -134,6 +135,7 @@ type
     class procedure Report(aFileName: String = '');
     class procedure Reset;
     class function  Enter(const aName: String): IProfileEntry;
+    class procedure Cancel(var aEntry: IProfileEntry);
   end;
 
 
@@ -158,6 +160,7 @@ type
     procedure Reset;
     procedure Start;
     procedure Stop;
+    procedure Cancel;
     function  IsRunning: Boolean;
 
     property Elapsed: TTimeSpan read GetElapsed;
@@ -205,6 +208,14 @@ begin
   inherited;
 end;
 
+function TTraceLogger.NoTrace: ILogger;
+begin
+  if Assigned(fProfile) then
+    TZenProfiler.Cancel(fProfile);
+
+  Result := Self;
+end;
+
 function TTraceLogger.Trace: ILogger;
 begin
   if not Assigned(fProfile) then
@@ -225,7 +236,7 @@ var
 begin
   if fLogger.LogLevel >= Ord(LineType) then begin
     sLine := fContext + ': ' + MsgText;
-    case fLogger.LogLevel of
+    case Ord(LineType) of
       LL_ERROR   : fLogger.Error(sLine);
       LL_WARNING : fLogger.Warning(sLine);
       LL_INFO    : fLogger.Info(sLine);
@@ -260,6 +271,14 @@ end;
 class function TZenProfiler.Enter(const aName: String): IProfileEntry;
 begin
   Result := TProfileEntry.Create(aName);
+end;
+
+class procedure TZenProfiler.Cancel(var aEntry: IProfileEntry);
+begin
+  if (aEntry is TProfileEntry) then begin
+    TProfileEntry(aEntry).Cancel;
+    aEntry := nil;
+  end;
 end;
 
 class function TZenProfiler.GetDefaultFileName: String;
@@ -362,7 +381,8 @@ end;
 destructor TProfileEntry.Destroy;
 begin
   fTime.Stop;
-  TZenProfiler.Add(fName, fTime.ElapsedMilliseconds);
+  if fName <> '' then
+    TZenProfiler.Add(fName, fTime.ElapsedMilliseconds);
   inherited;
 end;
 
@@ -418,6 +438,12 @@ end;
 procedure TProfileEntry.Stop;
 begin
   fTime.Stop;
+end;
+
+procedure TProfileEntry.Cancel;
+begin
+  fTime.Reset;
+  fName := '';  //prevent adding this entry!
 end;
 
 initialization
